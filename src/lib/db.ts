@@ -6,6 +6,8 @@ import type {
   Application,
   ApplicationStatus,
   JobWithApplication,
+  PipelineItem,
+  PipelineStage,
 } from "./types";
 
 const DB_PATH = path.join(process.cwd(), "data", "jobs.db");
@@ -62,9 +64,27 @@ function initSchema(db: Database.Database): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS pipeline (
+      id TEXT PRIMARY KEY,
+      company TEXT NOT NULL,
+      careers_url TEXT,
+      job_url TEXT,
+      role TEXT,
+      location TEXT,
+      description TEXT,
+      tailored_html TEXT,
+      tailored_changes TEXT,
+      stage TEXT DEFAULT 'queued',
+      error TEXT,
+      source TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_applications_job_id ON applications(job_id);
     CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
     CREATE INDEX IF NOT EXISTS idx_resume_variants_job_id ON resume_variants(job_id);
+    CREATE INDEX IF NOT EXISTS idx_pipeline_stage ON pipeline(stage);
   `);
 }
 
@@ -375,4 +395,91 @@ export function bulkCreateJobs(
   );
 
   return insertMany(jobs);
+}
+
+// --- Pipeline ---
+
+export function addToPipeline(item: {
+  company: string;
+  careers_url?: string;
+  job_url?: string;
+  role?: string;
+}): PipelineItem {
+  const db = getDb();
+  const id = uuid();
+
+  db.prepare(
+    `INSERT INTO pipeline (id, company, careers_url, job_url, role, stage)
+     VALUES (?, ?, ?, ?, ?, 'queued')`
+  ).run(id, item.company, item.careers_url || null, item.job_url || null, item.role || null);
+
+  return db.prepare("SELECT * FROM pipeline WHERE id = ?").get(id) as PipelineItem;
+}
+
+export function getPipelineItems(stage?: string): PipelineItem[] {
+  const db = getDb();
+  if (stage) {
+    return db.prepare("SELECT * FROM pipeline WHERE stage = ? ORDER BY created_at DESC").all(stage) as PipelineItem[];
+  }
+  return db.prepare("SELECT * FROM pipeline ORDER BY created_at DESC").all() as PipelineItem[];
+}
+
+export function getNextQueuedItem(): PipelineItem | null {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM pipeline WHERE stage = 'queued' ORDER BY created_at ASC LIMIT 1").get() as PipelineItem) || null;
+}
+
+export function getNextScrapedItem(): PipelineItem | null {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM pipeline WHERE stage = 'scraped' ORDER BY created_at ASC LIMIT 1").get() as PipelineItem) || null;
+}
+
+export function updatePipelineItem(
+  id: string,
+  updates: Partial<{
+    job_url: string;
+    role: string;
+    location: string;
+    description: string;
+    tailored_html: string;
+    tailored_changes: string;
+    stage: PipelineStage;
+    error: string;
+    source: string;
+  }>
+): PipelineItem | null {
+  const db = getDb();
+  const fields: string[] = ["updated_at = datetime('now')"];
+  const values: unknown[] = [];
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) {
+      fields.push(`${key} = ?`);
+      values.push(value);
+    }
+  }
+
+  values.push(id);
+  db.prepare(`UPDATE pipeline SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+
+  return db.prepare("SELECT * FROM pipeline WHERE id = ?").get(id) as PipelineItem | null;
+}
+
+export function deletePipelineItem(id: string): boolean {
+  const db = getDb();
+  const result = db.prepare("DELETE FROM pipeline WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
+export function getPipelineStats(): Record<string, number> {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT stage, COUNT(*) as count FROM pipeline GROUP BY stage"
+  ).all() as { stage: string; count: number }[];
+
+  const stats: Record<string, number> = {};
+  for (const row of rows) {
+    stats[row.stage] = row.count;
+  }
+  return stats;
 }

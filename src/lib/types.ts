@@ -89,6 +89,61 @@ export const APPLICATION_STATUS_LABELS: Record<ApplicationStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
+export type PipelineStage =
+  | "queued"
+  | "scraping"
+  | "scraped"
+  | "tailoring"
+  | "ready"
+  | "approved"
+  | "applying"
+  | "applied"
+  | "failed"
+  | "skipped";
+
+export interface PipelineItem {
+  id: string;
+  company: string;
+  careers_url: string | null;
+  job_url: string | null;
+  role: string | null;
+  location: string | null;
+  description: string | null;
+  tailored_html: string | null;
+  tailored_changes: string | null;
+  stage: PipelineStage;
+  error: string | null;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  queued: "Queued",
+  scraping: "Scraping...",
+  scraped: "JD Found",
+  tailoring: "Tailoring...",
+  ready: "Ready to Review",
+  approved: "Approved",
+  applying: "Applying...",
+  applied: "Applied",
+  failed: "Failed",
+  skipped: "Skipped",
+};
+
+export const PIPELINE_STAGE_COLORS: Record<PipelineStage, string> = {
+  queued: "bg-gray-100 text-gray-600",
+  scraping: "bg-yellow-100 text-yellow-700 animate-pulse",
+  scraped: "bg-blue-100 text-blue-700",
+  tailoring: "bg-purple-100 text-purple-700 animate-pulse",
+  ready: "bg-green-100 text-green-700",
+  approved: "bg-indigo-100 text-indigo-700",
+  applying: "bg-yellow-100 text-yellow-700 animate-pulse",
+  applied: "bg-green-200 text-green-800",
+  failed: "bg-red-100 text-red-700",
+  skipped: "bg-gray-200 text-gray-500",
+};
+
 export const APPLICATION_STATUS_COLORS: Record<ApplicationStatus, string> = {
   not_applied: "bg-gray-100 text-gray-700",
   resume_tailored: "bg-blue-100 text-blue-700",
