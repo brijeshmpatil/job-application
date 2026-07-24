@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     try {
       const resumeHtml = getResumeHtml();
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
       const prompt = `You are a resume tailoring expert. Given a base resume (HTML) and a job description, produce a tailored version.
 
@@ -283,7 +283,7 @@ Respond with ONLY a valid JSON object (no markdown code fences):
           const resumeHtml = getResumeHtml();
           const genAI = new GoogleGenerativeAI(apiKey);
           const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
+            model: "gemini-3-flash-preview",
           });
 
           const prompt = `You are a resume tailoring expert. Tailor this resume for the job.
@@ -320,16 +320,21 @@ Respond with ONLY valid JSON (no code fences):
             stage: "ready",
             status: "tailored",
           });
-        } catch {
+        } catch (tailorErr) {
+          const errMsg = tailorErr instanceof Error ? tailorErr.message : String(tailorErr);
+          const isRateLimit = errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("RESOURCE_EXHAUSTED");
+
           updatePipelineItem(item.id, {
-            stage: "failed",
-            error: "Tailoring failed",
+            stage: isRateLimit ? "scraped" : "failed",
+            error: isRateLimit ? "Rate limited — will retry next run" : `Tailoring failed: ${errMsg.slice(0, 100)}`,
           });
           results.push({
             company: item.company,
-            stage: "failed",
-            status: "tailor_error",
+            stage: isRateLimit ? "scraped" : "failed",
+            status: isRateLimit ? "rate_limited" : "tailor_error",
           });
+          // Stop tailoring if rate limited
+          if (isRateLimit) break;
         }
       }
     }

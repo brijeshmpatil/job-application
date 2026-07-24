@@ -21,7 +21,37 @@ const CAREER_PAGE_PATTERNS = [
   "/company/careers",
   "/en/careers",
   "/about/careers",
+  "/company/careers/open-positions",
 ];
+
+// Known career page URLs for popular companies
+const KNOWN_CAREER_URLS: Record<string, string[]> = {
+  atlassian: ["https://www.atlassian.com/company/careers/all-jobs"],
+  razorpay: ["https://razorpay.com/careers/", "https://razorpay.com/tech/"],
+  postman: ["https://www.postman.com/company/careers/open-positions/"],
+  cred: ["https://careers.cred.club/openings"],
+  swiggy: ["https://careers.swiggy.in/"],
+  flipkart: ["https://www.flipkartcareers.com/"],
+  myntra: ["https://careers.myntra.com/"],
+  groww: ["https://groww.in/careers"],
+  zerodha: ["https://zerodha.com/careers/"],
+  freshworks: ["https://careers.smartrecruiters.com/Freshworks"],
+  salesforce: ["https://careers.salesforce.com/en/jobs/?search=&country=India"],
+  microsoft: ["https://careers.microsoft.com/v2/global/en/locations/bengaluru.html"],
+  google: ["https://www.google.com/about/careers/applications/jobs/results/?location=Bangalore%20India"],
+  uber: ["https://jobs.uber.com/en/jobs/?location=Bengaluru"],
+  gojek: ["https://www.gojek.io/careers"],
+  tekion: ["https://tekion.com/careers"],
+  godaddy: ["https://careers.godaddy.com/search-results"],
+  commvault: ["https://careers.commvault.com/us/en/search-results"],
+  cisco: ["https://jobs.cisco.com/jobs/SearchJobs"],
+  adobe: ["https://careers.adobe.com/us/en/search-results"],
+  intuit: ["https://www.intuit.com/in/careers/"],
+  browserstack: ["https://www.browserstack.com/careers"],
+  lenskart: ["https://careers.lenskart.com/"],
+  phonepe: ["https://www.phonepe.com/careers/"],
+  meesho: ["https://meesho.io/careers"],
+};
 
 const FRONTEND_KEYWORDS = [
   "frontend",
@@ -170,7 +200,31 @@ export async function scrapeCompanyJobs(
     if (jobs.length > 0) return jobs;
   }
 
-  // Step 2: Try common career page patterns
+  // Step 2: Try known career URLs for this company
+  const companyKey = company.toLowerCase().replace(/\s+/g, "");
+  const knownUrls = KNOWN_CAREER_URLS[companyKey] || [];
+  for (const url of knownUrls) {
+    const html = await fetchPageContent(url);
+    if (!html) continue;
+
+    const listings = extractJobListings(html, url);
+    for (const listing of listings.slice(0, 3)) {
+      const description = await scrapeJobDescription(listing.url);
+      if (description) {
+        jobs.push({
+          role: listing.title,
+          location: extractLocation(description),
+          description,
+          applyUrl: listing.url,
+          source: "career_page",
+        });
+      }
+    }
+
+    if (jobs.length > 0) return jobs;
+  }
+
+  // Step 3: Try common career page patterns on guessed URLs
   const baseUrls = companyToBaseUrl(company);
   for (const baseUrl of baseUrls) {
     for (const pattern of CAREER_PAGE_PATTERNS) {
@@ -196,11 +250,61 @@ export async function scrapeCompanyJobs(
     }
   }
 
-  // Step 3: Fall back to Adzuna API
+  // Step 3: Fall back to Adzuna API (company-specific)
   const adzunaJobs = await searchAdzunaForCompany(company);
-  jobs.push(...adzunaJobs);
+  if (adzunaJobs.length > 0) {
+    jobs.push(...adzunaJobs);
+    return jobs;
+  }
+
+  // Step 4: Generic frontend job search via Adzuna (not company-specific)
+  const genericJobs = await searchAdzunaGeneric();
+  jobs.push(...genericJobs);
 
   return jobs;
+}
+
+async function searchAdzunaGeneric(): Promise<ScrapedJob[]> {
+  const appId = process.env.ADZUNA_APP_ID;
+  const appKey = process.env.ADZUNA_APP_KEY;
+  if (!appId || !appKey) return [];
+
+  try {
+    const params = new URLSearchParams({
+      app_id: appId,
+      app_key: appKey,
+      results_per_page: "5",
+      what: "frontend engineer react typescript",
+      where: "bangalore",
+      "content-type": "application/json",
+    });
+
+    const res = await fetch(
+      `https://api.adzuna.com/v1/api/jobs/in/search/1?${params}`,
+      { signal: AbortSignal.timeout(10000) }
+    );
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return (data.results || []).slice(0, 3).map(
+      (job: {
+        title: string;
+        company?: { display_name?: string };
+        location?: { display_name?: string };
+        description?: string;
+        redirect_url: string;
+      }) => ({
+        role: job.title,
+        location: job.location?.display_name || "India",
+        description: (job.description || "").slice(0, 3000),
+        applyUrl: job.redirect_url,
+        source: "adzuna" as const,
+      })
+    );
+  } catch {
+    return [];
+  }
 }
 
 function extractLocation(text: string): string {
@@ -224,44 +328,62 @@ async function searchAdzunaForCompany(
   const appKey = process.env.ADZUNA_APP_KEY;
   if (!appId || !appKey) return [];
 
-  try {
-    const params = new URLSearchParams({
-      app_id: appId,
-      app_key: appKey,
-      results_per_page: "5",
-      what: `frontend engineer ${company}`,
-      content_type: "application/json",
-    });
+  // Try company-specific search first, then generic frontend search
+  const queries = [
+    `frontend engineer ${company}`,
+    `react developer ${company}`,
+    `frontend engineer`,
+  ];
 
-    const res = await fetch(
-      `https://api.adzuna.com/v1/api/jobs/in/search/1?${params}`,
-      { signal: AbortSignal.timeout(10000) }
-    );
+  for (const query of queries) {
+    try {
+      const params = new URLSearchParams({
+        app_id: appId,
+        app_key: appKey,
+        results_per_page: "10",
+        what: query,
+        "content-type": "application/json",
+      });
 
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    return (data.results || [])
-      .filter((job: { company?: { display_name?: string } }) => {
-        const jobCompany = job.company?.display_name?.toLowerCase() || "";
-        return jobCompany.includes(company.toLowerCase().slice(0, 5));
-      })
-      .slice(0, 3)
-      .map(
-        (job: {
-          title: string;
-          location?: { display_name?: string };
-          description?: string;
-          redirect_url: string;
-        }) => ({
-          role: job.title,
-          location: job.location?.display_name || "India",
-          description: job.description?.slice(0, 3000) || "",
-          applyUrl: job.redirect_url,
-          source: "adzuna" as const,
-        })
+      const res = await fetch(
+        `https://api.adzuna.com/v1/api/jobs/in/search/1?${params}`,
+        { signal: AbortSignal.timeout(10000) }
       );
-  } catch {
-    return [];
+
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      const results = (data.results || []) as Array<{
+        title: string;
+        company?: { display_name?: string };
+        location?: { display_name?: string };
+        description?: string;
+        redirect_url: string;
+      }>;
+
+      // For company-specific queries, try to match company name
+      const companyLower = company.toLowerCase();
+      let filtered = results.filter((job) => {
+        const jobCompany = job.company?.display_name?.toLowerCase() || "";
+        return jobCompany.includes(companyLower.slice(0, 4));
+      });
+
+      // For generic query, skip — only return company-matched results
+      if (filtered.length === 0) continue;
+
+      if (filtered.length === 0) continue;
+
+      return filtered.slice(0, 3).map((job) => ({
+        role: job.title,
+        location: job.location?.display_name || "India",
+        description: job.description?.slice(0, 3000) || "",
+        applyUrl: job.redirect_url,
+        source: "adzuna" as const,
+      }));
+    } catch {
+      continue;
+    }
   }
+
+  return [];
 }
