@@ -108,8 +108,12 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold mb-4">By Company Type</h2>
           <div className="space-y-3">
             {Object.entries(stats.byType).map(([type, count]) => (
-              <div key={type} className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">{type}</span>
+              <a
+                key={type}
+                href={`/tracker?type=${encodeURIComponent(type)}`}
+                className="flex items-center justify-between hover:bg-gray-50 rounded-lg px-2 py-1 -mx-2 transition-colors cursor-pointer"
+              >
+                <span className="text-sm text-gray-600 hover:text-indigo-600">{type}</span>
                 <div className="flex items-center gap-3">
                   <div className="w-32 bg-gray-100 rounded-full h-2">
                     <div
@@ -123,7 +127,7 @@ export default function Dashboard() {
                     {count}
                   </span>
                 </div>
-              </div>
+              </a>
             ))}
           </div>
         </div>

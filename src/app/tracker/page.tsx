@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -17,10 +18,19 @@ import type { JobWithApplication, ApplicationStatus } from "@/lib/types";
 import { APPLICATION_STATUS_LABELS } from "@/lib/types";
 
 export default function TrackerPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">Loading...</div>}>
+      <TrackerContent />
+    </Suspense>
+  );
+}
+
+function TrackerContent() {
+  const searchParams = useSearchParams();
   const [jobs, setJobs] = useState<JobWithApplication[]>([]);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterType, setFilterType] = useState("");
+  const [filterType, setFilterType] = useState(searchParams.get("type") || "");
   const [showAddModal, setShowAddModal] = useState(false);
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

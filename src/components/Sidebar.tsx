@@ -15,7 +15,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/pipeline", label: "Pipeline", icon: Zap },
   { href: "/tracker", label: "Tracker", icon: ClipboardList },
-  { href: "/jobs", label: "Search Jobs", icon: Search },
+  { href: "/jobs", label: "Live Feed", icon: Search },
   { href: "/resume", label: "Resume", icon: FileText },
 ];
 

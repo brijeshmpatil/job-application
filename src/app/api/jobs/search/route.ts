@@ -35,7 +35,7 @@ async function searchAdzuna(
     app_key: appKey,
     results_per_page: "20",
     what: query,
-    content_type: "application/json",
+    "content-type": "application/json",
   });
 
   if (
@@ -65,6 +65,7 @@ async function searchAdzuna(
           : "",
       url: job.redirect_url,
       description: job.description?.slice(0, 300) || "",
+      source: "Adzuna",
     }));
   } catch {
     return [];
@@ -114,6 +115,7 @@ async function searchFindWork(
         salary: "",
         url: job.url,
         description: (job.text || "").slice(0, 300),
+        source: "FindWork",
       })
     );
   } catch {
