@@ -47,3 +47,5 @@ data/resumes/*.pdf
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+data/jobs.db-shm
+data/jobs.db-wal
