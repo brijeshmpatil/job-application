@@ -98,7 +98,7 @@ function TrackerContent() {
   ) as ApplicationStatus[];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -118,8 +118,8 @@ function TrackerContent() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
@@ -168,144 +168,114 @@ function TrackerContent() {
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Company & Role
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Details
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Salary (LPA)
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Hiring
-                </th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {jobs.map((job) => (
-                <tr key={job.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-gray-900 text-sm">
-                      {job.company}
-                    </div>
-                    <div className="text-xs text-gray-500">{job.role}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      {job.location && (
-                        <span className="flex items-center gap-1 text-xs text-gray-500">
-                          <MapPin className="w-3 h-3" />
-                          {job.location}
-                        </span>
-                      )}
-                      {job.type && (
-                        <span className="flex items-center gap-1 text-xs text-gray-500">
-                          <Building2 className="w-3 h-3" />
-                          {job.type}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {job.salary_min || job.salary_max ? (
-                      <span className="flex items-center gap-1 text-sm text-gray-700">
+        <div className="space-y-3">
+          {jobs.map((job) => (
+            <div
+              key={job.id}
+              className="bg-white border rounded-xl p-4 hover:border-gray-300 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-gray-900 text-sm">
+                    {job.company}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{job.role}</div>
+
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    {job.location && (
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        <MapPin className="w-3 h-3" />
+                        {job.location}
+                      </span>
+                    )}
+                    {job.type && (
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        <Building2 className="w-3 h-3" />
+                        {job.type}
+                      </span>
+                    )}
+                    {(job.salary_min || job.salary_max) && (
+                      <span className="flex items-center gap-1 text-xs text-gray-600">
                         <IndianRupee className="w-3 h-3" />
-                        {job.salary_min || "?"}–{job.salary_max || "?"}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 relative">
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setStatusDropdown(
-                            statusDropdown === job.id ? null : job.id
-                          )
-                        }
-                        className="flex items-center gap-1"
-                      >
-                        <StatusBadge
-                          status={
-                            job.application?.status || "not_applied"
-                          }
-                        />
-                        <ChevronDown className="w-3 h-3 text-gray-400" />
-                      </button>
-                      {statusDropdown === job.id && (
-                        <div className="absolute z-20 mt-1 bg-white border rounded-lg shadow-lg py-1 min-w-[160px]">
-                          {allStatuses.map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => handleStatusChange(job.id, s)}
-                              className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
-                            >
-                              {APPLICATION_STATUS_LABELS[s]}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {job.hiring_status && (
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          job.hiring_status.includes("CONFIRMED")
-                            ? "bg-green-50 text-green-700"
-                            : job.hiring_status.includes("NO")
-                              ? "bg-red-50 text-red-700"
-                              : "bg-yellow-50 text-yellow-700"
-                        }`}
-                      >
-                        {job.hiring_status.includes("CONFIRMED")
-                          ? "Open"
-                          : job.hiring_status.includes("NO")
-                            ? "Closed"
-                            : "Check"}
+                        {job.salary_min || "?"}–{job.salary_max || "?"} LPA
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {job.apply_url && (
-                        <a
-                          href={
-                            job.apply_url.startsWith("http")
-                              ? job.apply_url
-                              : `https://${job.apply_url}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                          title="Open apply link"
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {job.apply_url && (
+                    <a
+                      href={
+                        job.apply_url.startsWith("http")
+                          ? job.apply_url
+                          : `https://${job.apply_url}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 text-gray-400 hover:text-indigo-600 rounded-lg"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => handleDelete(job.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      setStatusDropdown(
+                        statusDropdown === job.id ? null : job.id
+                      )
+                    }
+                    className="flex items-center gap-1"
+                  >
+                    <StatusBadge
+                      status={job.application?.status || "not_applied"}
+                    />
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                  </button>
+                  {statusDropdown === job.id && (
+                    <div className="absolute z-20 mt-1 bg-white border rounded-lg shadow-lg py-1 min-w-[160px]">
+                      {allStatuses.map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => handleStatusChange(job.id, s)}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50"
                         >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      <button
-                        onClick={() => handleDelete(job.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                          {APPLICATION_STATUS_LABELS[s]}
+                        </button>
+                      ))}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  )}
+                </div>
+                {job.hiring_status && (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      job.hiring_status.includes("CONFIRMED")
+                        ? "bg-green-50 text-green-700"
+                        : job.hiring_status.includes("NO")
+                          ? "bg-red-50 text-red-700"
+                          : "bg-yellow-50 text-yellow-700"
+                    }`}
+                  >
+                    {job.hiring_status.includes("CONFIRMED")
+                      ? "Open"
+                      : job.hiring_status.includes("NO")
+                        ? "Closed"
+                        : "Check"}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

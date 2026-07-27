@@ -53,7 +53,7 @@ export default function ResumePage() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Resume Tailoring</h1>
         <p className="text-gray-500 mt-1">
@@ -61,7 +61,7 @@ export default function ResumePage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Input */}
         <div className="space-y-4">
           <div>

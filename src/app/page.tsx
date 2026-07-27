@@ -75,7 +75,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 mt-1">
@@ -83,7 +83,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mb-8">
         {statCards.map((card) => {
           const Icon = card.icon;
           return (
@@ -103,8 +103,8 @@ export default function Dashboard() {
         })}
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-white rounded-xl border p-4 md:p-6">
           <h2 className="text-lg font-semibold mb-4">By Company Type</h2>
           <div className="space-y-3">
             {Object.entries(stats.byType).map(([type, count]) => (
