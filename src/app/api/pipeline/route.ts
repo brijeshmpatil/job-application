@@ -145,16 +145,19 @@ export async function POST(request: NextRequest) {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
-      const prompt = `You are a resume tailoring expert. Given a base resume (HTML) and a job description, produce a tailored version.
+      const prompt = `You are a resume tailoring expert. You MUST modify the EXACT HTML resume provided below. Do NOT create a new resume.
 
-RULES:
-1. NEVER fabricate skills, experience, or projects the candidate doesn't have
-2. ONLY reorder, rephrase, or emphasize existing content to better match the JD
-3. Adjust the summary paragraph to mirror the JD's language
-4. Reorder skill tags to front-load matches
-5. Adjust bullet point emphasis based on what the JD values
-6. Keep the HTML structure and CSS exactly the same — only change text content
-7. Keep all existing information — don't remove anything unless replacing with better wording
+CRITICAL RULES:
+1. The output MUST contain "Brijesh M Patil" — this is the candidate's real name
+2. The output MUST contain "brijeshmpatil77@gmail.com" — real email
+3. The output MUST contain "ShopTrade" — real current employer
+4. NEVER invent fake companies, names, emails, degrees, or experience
+5. ONLY modify text inside existing HTML tags — keep ALL HTML structure, CSS, classes EXACTLY as-is
+6. Reorder skill tags to front-load JD matches
+7. Rephrase bullet points to mirror JD language
+8. Adjust summary paragraph to match JD priorities
+9. If JD is vague, make MINIMAL changes
+10. Output MUST be complete HTML starting with <!DOCTYPE html>
 
 COMPANY: ${item.company}
 ROLE: ${item.role || "Frontend Engineer"}
@@ -162,20 +165,20 @@ ROLE: ${item.role || "Frontend Engineer"}
 JOB DESCRIPTION:
 ${item.description || "No description available"}
 
-BASE RESUME HTML:
+BASE RESUME HTML (modify THIS document, do NOT create new):
 ${resumeHtml}
 
-Respond with ONLY a valid JSON object (no markdown code fences):
+Respond with ONLY valid JSON (no markdown code fences):
 {
   "changes": [
     {
       "section": "Summary|Experience|Skills|Projects",
-      "before": "original text",
+      "before": "original text from the resume above",
       "after": "modified text",
       "reason": "why this change was made"
     }
   ],
-  "html": "the complete modified HTML resume"
+  "html": "the COMPLETE modified HTML document starting with <!DOCTYPE html>"
 }`;
 
       const result = await model.generateContent(prompt);
@@ -188,17 +191,39 @@ Respond with ONLY a valid JSON object (no markdown code fences):
         .trim();
 
       const parsed = JSON.parse(cleanJson);
+      const html = parsed.html || "";
 
-      updatePipelineItem(item.id, {
-        stage: "ready",
-        tailored_html: parsed.html || resumeHtml,
-        tailored_changes: JSON.stringify(parsed.changes || []),
-      });
+      // Validate — reject if AI hallucinated a new resume
+      const isValid =
+        html.includes("Brijesh") &&
+        html.includes("brijeshmpatil77") &&
+        html.includes("ShopTrade");
+
+      if (!isValid) {
+        // AI hallucinated — use original resume instead
+        updatePipelineItem(item.id, {
+          stage: "ready",
+          tailored_html: resumeHtml,
+          tailored_changes: JSON.stringify([{
+            section: "Notice",
+            before: "",
+            after: "AI output was invalid (hallucinated). Using original resume. You can manually tailor on the Resume page.",
+            reason: "Validation failed — AI created fake content instead of modifying your resume"
+          }]),
+        });
+      } else {
+        updatePipelineItem(item.id, {
+          stage: "ready",
+          tailored_html: html,
+          tailored_changes: JSON.stringify(parsed.changes || []),
+        });
+      }
 
       return Response.json({
         status: "tailored",
         company: item.company,
         changes: parsed.changes?.length || 0,
+        valid: isValid,
       });
     } catch (err) {
       updatePipelineItem(item.id, {
@@ -286,19 +311,27 @@ Respond with ONLY a valid JSON object (no markdown code fences):
             model: "gemini-3-flash-preview",
           });
 
-          const prompt = `You are a resume tailoring expert. Tailor this resume for the job.
+          const prompt = `You are a resume tailoring expert. You MUST modify the EXACT HTML resume provided below. Do NOT create a new resume. Do NOT invent new content.
 
-RULES: Never fabricate. Only reorder, rephrase, emphasize existing content. Keep HTML/CSS structure.
+CRITICAL RULES:
+1. The output HTML MUST contain the candidate's real name: "Brijesh M Patil"
+2. The output HTML MUST contain the real email: "brijeshmpatil77@gmail.com"
+3. The output HTML MUST contain the real company: "ShopTrade"
+4. NEVER invent fake companies, fake names, fake emails, or fake experience
+5. ONLY modify text content inside the existing HTML tags — keep all HTML structure, CSS, and classes EXACTLY as-is
+6. You may reorder skill tags, rephrase bullet points, and adjust the summary paragraph
+7. If the job description is too short or vague, make MINIMAL changes only
+8. The output MUST be a valid complete HTML document starting with <!DOCTYPE html>
 
 COMPANY: ${item.company}
 ROLE: ${item.role || "Frontend Engineer"}
 JOB DESCRIPTION: ${(item.description || "").slice(0, 3000)}
 
-BASE RESUME HTML:
+BASE RESUME HTML (modify THIS, do not create new):
 ${resumeHtml}
 
 Respond with ONLY valid JSON (no code fences):
-{"changes":[{"section":"...","before":"...","after":"...","reason":"..."}],"html":"complete modified HTML"}`;
+{"changes":[{"section":"Summary|Experience|Skills|Projects","before":"original text from resume","after":"modified text","reason":"why"}],"html":"the COMPLETE modified HTML document starting with <!DOCTYPE html>"}`;
 
           const result = await model.generateContent(prompt);
           const text = result.response.text();
@@ -308,12 +341,31 @@ Respond with ONLY valid JSON (no code fences):
             .replace(/```\s*$/, "")
             .trim();
           const parsed = JSON.parse(clean);
+          const bulkHtml = parsed.html || "";
 
-          updatePipelineItem(item.id, {
-            stage: "ready",
-            tailored_html: parsed.html || resumeHtml,
-            tailored_changes: JSON.stringify(parsed.changes || []),
-          });
+          const bulkValid =
+            bulkHtml.includes("Brijesh") &&
+            bulkHtml.includes("brijeshmpatil77") &&
+            bulkHtml.includes("ShopTrade");
+
+          if (!bulkValid) {
+            updatePipelineItem(item.id, {
+              stage: "ready",
+              tailored_html: resumeHtml,
+              tailored_changes: JSON.stringify([{
+                section: "Notice",
+                before: "",
+                after: "AI output invalid. Using original resume.",
+                reason: "Validation failed"
+              }]),
+            });
+          } else {
+            updatePipelineItem(item.id, {
+              stage: "ready",
+              tailored_html: bulkHtml,
+              tailored_changes: JSON.stringify(parsed.changes || []),
+            });
+          }
 
           results.push({
             company: item.company,
