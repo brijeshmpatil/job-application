@@ -18,10 +18,6 @@ interface ScrapedJob {
 const CAREER_PAGE_PATTERNS = [
   "/careers",
   "/jobs",
-  "/company/careers",
-  "/en/careers",
-  "/about/careers",
-  "/company/careers/open-positions",
 ];
 
 // Known career page URLs for popular companies
@@ -79,17 +75,13 @@ function companyToBaseUrl(company: string): string[] {
   return [
     `https://www.${clean}.com`,
     `https://${clean}.com`,
-    `https://www.${withDash}.com`,
-    `https://${withDash}.com`,
-    `https://careers.${clean}.com`,
-    `https://jobs.${clean}.com`,
   ];
 }
 
 async function fetchPageContent(url: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 4000);
 
     const res = await fetch(url, {
       signal: controller.signal,
