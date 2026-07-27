@@ -119,26 +119,25 @@ export default function PipelinePage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="mb-6">
+        <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-bold text-gray-900">Pipeline</h1>
-          <p className="text-gray-500 mt-1">
-            Add companies → auto-scrape JDs → auto-tailor resume → you approve →
-            apply
-          </p>
+          <button
+            onClick={runLoop}
+            disabled={processing}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors flex-shrink-0"
+          >
+            {processing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Zap className="w-4 h-4" />
+            )}
+            {processing ? "Processing..." : "Run Pipeline"}
+          </button>
         </div>
-        <button
-          onClick={runLoop}
-          disabled={processing}
-          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-        >
-          {processing ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Zap className="w-4 h-4" />
-          )}
-          {processing ? "Processing..." : "Run Pipeline"}
-        </button>
+        <p className="text-gray-500 mt-1 text-sm">
+          Add companies → auto-scrape → auto-tailor → you approve → apply
+        </p>
       </div>
 
       {/* Add Company */}
@@ -219,7 +218,7 @@ export default function PipelinePage() {
                       key={item.id}
                       className="bg-white border-2 border-green-200 rounded-xl p-5"
                     >
-                      <div className="flex items-start justify-between">
+                      <div>
                         <div className="flex-1">
                           <h3 className="font-semibold text-gray-900 text-lg">
                             {item.company}
@@ -227,16 +226,18 @@ export default function PipelinePage() {
                           <p className="text-sm text-gray-600">
                             {item.role || "Frontend Engineer"}
                           </p>
-                          {item.location && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              {item.location}
-                            </p>
-                          )}
-                          {item.source && (
-                            <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded">
-                              Source: {item.source}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {item.location && (
+                              <span className="text-xs text-gray-500">
+                                {item.location}
+                              </span>
+                            )}
+                            {item.source && (
+                              <span className="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded">
+                                via {item.source}
+                              </span>
+                            )}
+                          </div>
 
                           {/* Changes summary */}
                           {changes.length > 0 && (
@@ -267,19 +268,17 @@ export default function PipelinePage() {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="flex items-center gap-2 mt-4 pt-3 border-t">
                           <button
                             onClick={() => previewResume(item)}
                             className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
-                            title="Preview tailored resume"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             Preview
                           </button>
                           <button
                             onClick={() => approveItem(item.id)}
-                            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-                            title="Approve and open apply link"
+                            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
                           >
                             <Check className="w-3.5 h-3.5" />
                             Approve & Apply
@@ -287,7 +286,6 @@ export default function PipelinePage() {
                           <button
                             onClick={() => skipItem(item.id)}
                             className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                            title="Skip"
                           >
                             <X className="w-4 h-4" />
                           </button>

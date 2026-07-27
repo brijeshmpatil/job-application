@@ -93,7 +93,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto">{children}</main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden flex items-center justify-around border-t bg-white py-2 sticky bottom-0 z-30">
+        <nav className="md:hidden flex items-center justify-around border-t bg-white pt-2 pb-[env(safe-area-inset-bottom,8px)] sticky bottom-0 z-30">
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
