@@ -9,6 +9,7 @@ import {
   XCircle,
   FileText,
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 interface Stats {
   total: number;
@@ -20,7 +21,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
-    fetch("/api/tracker?action=stats")
+    apiFetch("/api/tracker?action=stats")
       .then((res) => res.json())
       .then(setStats);
   }, []);

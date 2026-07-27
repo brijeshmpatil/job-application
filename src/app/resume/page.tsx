@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiPost } from "@/lib/api";
 import { FileText, Wand2, Download, Eye } from "lucide-react";
 
 export default function ResumePage() {
@@ -16,13 +17,9 @@ export default function ResumePage() {
     if (!jobDescription.trim()) return;
     setTailoring(true);
     try {
-      const res = await fetch("/api/resume/tailor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jobDescription,
-          companyName,
-        }),
+      const res = await apiPost("/api/resume/tailor", {
+        jobDescription,
+        companyName,
       });
       const data = await res.json();
       setResult(data);
@@ -35,10 +32,9 @@ export default function ResumePage() {
   const handleExportPdf = async () => {
     if (!result?.html) return;
     try {
-      const res = await fetch("/api/resume/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html: result.html, companyName }),
+      const res = await apiPost("/api/resume/export", {
+        html: result.html,
+        companyName,
       });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

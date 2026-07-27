@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch, apiPost } from "@/lib/api";
 import {
   Search,
   MapPin,
@@ -34,7 +35,7 @@ export default function JobFeedPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ query, location });
-      const res = await fetch(`/api/jobs/search?${params}`);
+      const res = await apiFetch(`/api/jobs/search?${params}`);
       const data = await res.json();
       setJobs(data.jobs || []);
       setLastRefresh(new Date().toLocaleTimeString());
@@ -75,15 +76,11 @@ export default function JobFeedPage() {
     if (selected.length === 0) return;
 
     for (const job of selected) {
-      await fetch("/api/pipeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "add",
-          company: job.company,
-          job_url: job.url,
-          role: job.title,
-        }),
+      await apiPost("/api/pipeline", {
+        action: "add",
+        company: job.company,
+        job_url: job.url,
+        role: job.title,
       });
     }
 

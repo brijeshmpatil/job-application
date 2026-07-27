@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { apiFetch, apiPost } from "@/lib/api";
 import {
   Play,
   Plus,
@@ -30,7 +31,7 @@ export default function PipelinePage() {
   const [previewCompany, setPreviewCompany] = useState("");
 
   const fetchItems = useCallback(async () => {
-    const res = await fetch("/api/pipeline");
+    const res = await apiFetch("/api/pipeline");
     const data = await res.json();
     setItems(data.items || []);
     setLoading(false);
@@ -49,11 +50,7 @@ export default function PipelinePage() {
 
   const addCompany = async () => {
     if (!companyInput.trim()) return;
-    await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add", company: companyInput.trim() }),
-    });
+    await apiPost("/api/pipeline", { action: "add", company: companyInput.trim() });
     setCompanyInput("");
     fetchItems();
   };
@@ -65,11 +62,7 @@ export default function PipelinePage() {
       .filter(Boolean);
     if (companies.length === 0) return;
 
-    await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_bulk", companies }),
-    });
+    await apiPost("/api/pipeline", { action: "add_bulk", companies });
     setBulkInput("");
     setShowBulk(false);
     fetchItems();
@@ -78,11 +71,7 @@ export default function PipelinePage() {
   const runLoop = async () => {
     setProcessing(true);
     try {
-      await fetch("/api/pipeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "run_loop" }),
-      });
+      await apiPost("/api/pipeline", { action: "run_loop" });
     } finally {
       setProcessing(false);
       fetchItems();
@@ -90,11 +79,7 @@ export default function PipelinePage() {
   };
 
   const approveItem = async (id: string) => {
-    const res = await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve", id }),
-    });
+    const res = await apiPost("/api/pipeline", { action: "approve", id });
     const data = await res.json();
     if (data.apply_url) {
       window.open(
@@ -108,20 +93,12 @@ export default function PipelinePage() {
   };
 
   const skipItem = async (id: string) => {
-    await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "skip", id }),
-    });
+    await apiPost("/api/pipeline", { action: "skip", id });
     fetchItems();
   };
 
   const deleteItem = async (id: string) => {
-    await fetch("/api/pipeline", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete", id }),
-    });
+    await apiPost("/api/pipeline", { action: "delete", id });
     fetchItems();
   };
 

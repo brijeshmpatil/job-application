@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { apiFetch, apiPost } from "@/lib/api";
 import {
   Plus,
   Search,
@@ -41,7 +42,7 @@ function TrackerContent() {
     if (filterStatus) params.set("status", filterStatus);
     if (filterType) params.set("type", filterType);
 
-    const res = await fetch(`/api/tracker?${params}`);
+    const res = await apiFetch(`/api/tracker?${params}`);
     const data = await res.json();
     setJobs(data.jobs);
     setLoading(false);
@@ -62,11 +63,7 @@ function TrackerContent() {
     description: string;
     notes: string;
   }) => {
-    await fetch("/api/tracker", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create", ...job }),
-    });
+    await apiPost("/api/tracker", { action: "create", ...job });
     fetchJobs();
   };
 
@@ -74,22 +71,14 @@ function TrackerContent() {
     jobId: string,
     status: ApplicationStatus
   ) => {
-    await fetch("/api/tracker", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update_status", job_id: jobId, status }),
-    });
+    await apiPost("/api/tracker", { action: "update_status", job_id: jobId, status });
     setStatusDropdown(null);
     fetchJobs();
   };
 
   const handleDelete = async (jobId: string) => {
     if (!confirm("Delete this job?")) return;
-    await fetch("/api/tracker", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "delete", id: jobId }),
-    });
+    await apiPost("/api/tracker", { action: "delete", id: jobId });
     fetchJobs();
   };
 
