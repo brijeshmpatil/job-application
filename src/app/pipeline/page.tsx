@@ -271,21 +271,21 @@ export default function PipelinePage() {
                         <div className="flex items-center gap-2 mt-4 pt-3 border-t">
                           <button
                             onClick={() => previewResume(item)}
-                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-4 h-4" />
                             Preview
                           </button>
                           <button
                             onClick={() => approveItem(item.id)}
-                            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+                            className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-4 h-4" />
                             Approve & Apply
                           </button>
                           <button
                             onClick={() => skipItem(item.id)}
-                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                            className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg ml-auto"
                           >
                             <X className="w-4 h-4" />
                           </button>

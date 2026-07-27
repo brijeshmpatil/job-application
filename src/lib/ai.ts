@@ -11,80 +11,94 @@ function getClient(): Groq {
   return _client;
 }
 
-export async function generateTailoredResume(prompt: string): Promise<{
-  changes: Array<{ section: string; before: string; after: string; reason: string }>;
-  html: string;
-}> {
+interface ResumeChange {
+  section: string;
+  find: string;
+  replace: string;
+  reason: string;
+}
+
+/**
+ * Ask AI to generate text-level replacements (NOT full HTML).
+ * We apply these to the original HTML ourselves — preserving all styling.
+ */
+export async function generateResumeChanges(
+  resumeHtml: string,
+  company: string,
+  role: string,
+  jobDescription: string
+): Promise<{ changes: ResumeChange[]; html: string }> {
   const client = getClient();
+
+  const prompt = `You are a resume tailoring expert. Analyze the job description and suggest text replacements for the resume below.
+
+RULES:
+1. Output a list of find-and-replace operations on the resume text
+2. Each "find" must be an EXACT substring from the resume HTML below — copy it character-for-character
+3. Each "replace" is the modified version of that text
+4. NEVER invent fake experience, companies, or skills
+5. ONLY rephrase, reorder emphasis, or adjust wording to match the JD
+6. Keep changes minimal and impactful — 3 to 6 changes max
+7. Focus on: summary paragraph, bullet point text, skill tag order
+
+COMPANY: ${company}
+ROLE: ${role}
+
+JOB DESCRIPTION:
+${jobDescription.slice(0, 2000)}
+
+RESUME HTML:
+${resumeHtml}
+
+Respond with ONLY this JSON:
+{
+  "changes": [
+    {
+      "section": "Summary|Experience|Skills",
+      "find": "exact text from the resume to find",
+      "replace": "replacement text",
+      "reason": "why this change helps"
+    }
+  ]
+}`;
 
   const completion = await client.chat.completions.create({
     model: "llama-3.3-70b-versatile",
     messages: [
       {
         role: "system",
-        content: "You are a resume tailoring expert. You MUST output ONLY valid JSON. No markdown, no code fences, no explanation. Just the JSON object.",
+        content:
+          "You output ONLY valid JSON. Each 'find' value must be an exact substring from the provided HTML. No markdown fences.",
       },
-      {
-        role: "user",
-        content: prompt,
-      },
+      { role: "user", content: prompt },
     ],
-    temperature: 0.3,
-    max_tokens: 8192,
+    temperature: 0.2,
+    max_tokens: 4096,
     response_format: { type: "json_object" },
   });
 
   const responseText = completion.choices[0]?.message?.content || "{}";
+  const parsed = JSON.parse(responseText);
+  const changes: ResumeChange[] = parsed.changes || [];
 
-  const cleanJson = responseText
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/, "")
-    .trim();
+  // Apply changes to original HTML
+  let tailoredHtml = resumeHtml;
+  const appliedChanges: ResumeChange[] = [];
 
-  return JSON.parse(cleanJson);
-}
+  for (const change of changes) {
+    if (!change.find || !change.replace || change.find === change.replace) continue;
 
-export function buildTailorPrompt(
-  resumeHtml: string,
-  company: string,
-  role: string,
-  jobDescription: string
-): string {
-  return `You MUST modify the EXACT HTML resume provided below. Do NOT create a new resume. Do NOT invent new content.
-
-CRITICAL RULES:
-1. The output MUST contain the candidate's real name: "Brijesh M Patil"
-2. The output MUST contain the real email: "brijeshmpatil77@gmail.com"
-3. The output MUST contain the real company: "ShopTrade"
-4. NEVER invent fake companies, fake names, fake emails, or fake experience
-5. ONLY modify text content inside the existing HTML tags — keep all HTML structure, CSS, and classes EXACTLY as-is
-6. You may reorder skill tags, rephrase bullet points, and adjust the summary paragraph to better match the JD
-7. If the job description is too short or vague, make MINIMAL changes only
-8. The output MUST be a valid complete HTML document starting with <!DOCTYPE html>
-9. Keep ALL existing sections — do not remove any content
-
-COMPANY: ${company}
-ROLE: ${role}
-
-JOB DESCRIPTION:
-${jobDescription}
-
-BASE RESUME HTML (modify THIS document, do NOT create new):
-${resumeHtml}
-
-Respond with this JSON structure:
-{
-  "changes": [
-    {
-      "section": "Summary|Experience|Skills|Projects",
-      "before": "original text from the resume",
-      "after": "modified text",
-      "reason": "why this change helps match the JD"
+    // Only apply if the exact text exists in the HTML
+    if (tailoredHtml.includes(change.find)) {
+      tailoredHtml = tailoredHtml.replace(change.find, change.replace);
+      appliedChanges.push(change);
     }
-  ],
-  "html": "the COMPLETE modified HTML document starting with <!DOCTYPE html>"
-}`;
+  }
+
+  return {
+    changes: appliedChanges,
+    html: tailoredHtml,
+  };
 }
 
 export function validateTailoredResume(html: string): boolean {

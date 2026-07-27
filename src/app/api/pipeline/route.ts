@@ -11,7 +11,7 @@ import {
   updateApplicationStatus,
 } from "@/lib/db";
 import { scrapeCompanyJobs } from "@/lib/scraper";
-import { generateTailoredResume, buildTailorPrompt, validateTailoredResume } from "@/lib/ai";
+import { generateResumeChanges, validateTailoredResume } from "@/lib/ai";
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -28,13 +28,19 @@ function getResumeHtml(): string {
   }
 }
 
-function handleTailorResult(
+function saveTailorResult(
   itemId: string,
-  parsed: { changes?: Array<{ section: string; before: string; after: string; reason: string }>; html?: string },
+  result: { changes: Array<{ section: string; find: string; replace: string; reason: string }>; html: string },
   resumeHtml: string
 ): boolean {
-  const html = parsed.html || "";
-  const isValid = validateTailoredResume(html);
+  const isValid = validateTailoredResume(result.html);
+
+  const changesForDisplay = result.changes.map((c) => ({
+    section: c.section,
+    before: c.find,
+    after: c.replace,
+    reason: c.reason,
+  }));
 
   if (!isValid) {
     updatePipelineItem(itemId, {
@@ -43,15 +49,15 @@ function handleTailorResult(
       tailored_changes: JSON.stringify([{
         section: "Notice",
         before: "",
-        after: "AI output was invalid. Using original resume. Tailor manually on Resume page.",
-        reason: "Validation failed — AI created fake content"
+        after: "AI output was invalid. Using original resume.",
+        reason: "Validation failed"
       }]),
     });
   } else {
     updatePipelineItem(itemId, {
       stage: "ready",
-      tailored_html: html,
-      tailored_changes: JSON.stringify(parsed.changes || []),
+      tailored_html: result.html,
+      tailored_changes: JSON.stringify(changesForDisplay),
     });
   }
 
@@ -156,20 +162,19 @@ export async function POST(request: NextRequest) {
 
     try {
       const resumeHtml = getResumeHtml();
-      const prompt = buildTailorPrompt(
+      const result = await generateResumeChanges(
         resumeHtml,
         item.company,
         item.role || "Frontend Engineer",
         item.description || "No description available"
       );
 
-      const parsed = await generateTailoredResume(prompt);
-      const isValid = handleTailorResult(item.id, parsed, resumeHtml);
+      const isValid = saveTailorResult(item.id, result, resumeHtml);
 
       return Response.json({
         status: "tailored",
         company: item.company,
-        changes: parsed.changes?.length || 0,
+        changes: result.changes.length,
         valid: isValid,
       });
     } catch (err) {
@@ -229,15 +234,14 @@ export async function POST(request: NextRequest) {
 
       try {
         const resumeHtml = getResumeHtml();
-        const prompt = buildTailorPrompt(
+        const result = await generateResumeChanges(
           resumeHtml,
           item.company,
           item.role || "Frontend Engineer",
           (item.description || "").slice(0, 3000)
         );
 
-        const parsed = await generateTailoredResume(prompt);
-        handleTailorResult(item.id, parsed, resumeHtml);
+        saveTailorResult(item.id, result, resumeHtml);
         results.push({ company: item.company, stage: "ready", status: "tailored" });
       } catch (tailorErr) {
         const errMsg = tailorErr instanceof Error ? tailorErr.message : String(tailorErr);

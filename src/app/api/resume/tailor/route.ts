@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { generateTailoredResume, buildTailorPrompt, validateTailoredResume } from "@/lib/ai";
+import { generateResumeChanges, validateTailoredResume } from "@/lib/ai";
 import { readFileSync } from "fs";
 import path from "path";
 
@@ -34,21 +34,27 @@ export async function POST(request: NextRequest) {
   }
 
   const resumeHtml = getResumeHtml();
-  const prompt = buildTailorPrompt(
-    resumeHtml,
-    companyName || "Unknown",
-    "Frontend Engineer",
-    jobDescription
-  );
 
   try {
-    const parsed = await generateTailoredResume(prompt);
-    const html = parsed.html || "";
-    const isValid = validateTailoredResume(html);
+    const result = await generateResumeChanges(
+      resumeHtml,
+      companyName || "Unknown",
+      "Frontend Engineer",
+      jobDescription
+    );
+
+    const isValid = validateTailoredResume(result.html);
+
+    const changesForDisplay = result.changes.map((c) => ({
+      section: c.section,
+      before: c.find,
+      after: c.replace,
+      reason: c.reason,
+    }));
 
     return Response.json({
-      changes: parsed.changes || [],
-      html: isValid ? html : resumeHtml,
+      changes: changesForDisplay,
+      html: isValid ? result.html : resumeHtml,
       valid: isValid,
       warning: isValid ? undefined : "AI output was invalid. Showing original resume.",
     });
