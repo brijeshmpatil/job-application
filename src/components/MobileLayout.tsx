@@ -73,8 +73,8 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile header */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-900 text-white sticky top-0 z-30">
+      <div className="flex-1 flex flex-col min-h-screen md:min-h-0">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-gray-900 text-white fixed top-0 left-0 right-0 z-40">
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
               <Briefcase className="w-3.5 h-3.5" />
@@ -89,11 +89,11 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
           </button>
         </header>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        {/* Main content — padded for fixed header + bottom nav */}
+        <main className="flex-1 overflow-y-auto mt-[52px] mb-[60px] md:mt-0 md:mb-0">{children}</main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden flex items-center justify-around border-t bg-white pt-2 pb-[env(safe-area-inset-bottom,8px)] sticky bottom-0 z-30">
+        <nav className="md:hidden flex items-center justify-around border-t bg-white pt-2 pb-[env(safe-area-inset-bottom,8px)] fixed bottom-0 left-0 right-0 z-40">
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||

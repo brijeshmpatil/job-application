@@ -28,7 +28,7 @@ export default function Dashboard() {
 
   if (!stats) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-gray-500">Loading...</div>
       </div>
     );

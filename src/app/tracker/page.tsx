@@ -20,7 +20,7 @@ import { APPLICATION_STATUS_LABELS } from "@/lib/types";
 
 export default function TrackerPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-gray-500">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 min-h-[50vh] text-gray-500">Loading...</div>}>
       <TrackerContent />
     </Suspense>
   );
@@ -145,7 +145,7 @@ function TrackerContent() {
 
       {/* Table */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 min-h-[50vh] text-gray-500">Loading...</div>
       ) : jobs.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500 mb-4">No jobs found</p>

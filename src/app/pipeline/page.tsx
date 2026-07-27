@@ -186,7 +186,7 @@ export default function PipelinePage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 min-h-[50vh] text-gray-500">Loading...</div>
       ) : items.length === 0 ? (
         <div className="text-center py-16 bg-white border rounded-xl">
           <Zap className="w-12 h-12 text-gray-200 mx-auto mb-4" />
