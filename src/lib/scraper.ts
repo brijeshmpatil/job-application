@@ -1,10 +1,6 @@
 /**
- * Career page scraper — tries company website first, falls back to APIs.
- *
- * Strategy:
- * 1. Try known career page patterns (company.com/careers, jobs.company.com)
- * 2. Scrape for frontend/React/TypeScript job listings
- * 3. Fall back to Adzuna API search
+ * Job scraper — searches LinkedIn and Naukri public listings.
+ * No login required. No auto-apply. Just fetches public job data.
  */
 
 interface ScrapedJob {
@@ -12,42 +8,8 @@ interface ScrapedJob {
   location: string;
   description: string;
   applyUrl: string;
-  source: "career_page" | "adzuna" | "findwork";
+  source: "linkedin" | "naukri" | "career_page";
 }
-
-const CAREER_PAGE_PATTERNS = [
-  "/careers",
-  "/jobs",
-];
-
-// Known career page URLs for popular companies
-const KNOWN_CAREER_URLS: Record<string, string[]> = {
-  atlassian: ["https://www.atlassian.com/company/careers/all-jobs"],
-  razorpay: ["https://razorpay.com/careers/", "https://razorpay.com/tech/"],
-  postman: ["https://www.postman.com/company/careers/open-positions/"],
-  cred: ["https://careers.cred.club/openings"],
-  swiggy: ["https://careers.swiggy.in/"],
-  flipkart: ["https://www.flipkartcareers.com/"],
-  myntra: ["https://careers.myntra.com/"],
-  groww: ["https://groww.in/careers"],
-  zerodha: ["https://zerodha.com/careers/"],
-  freshworks: ["https://careers.smartrecruiters.com/Freshworks"],
-  salesforce: ["https://careers.salesforce.com/en/jobs/?search=&country=India"],
-  microsoft: ["https://careers.microsoft.com/v2/global/en/locations/bengaluru.html"],
-  google: ["https://www.google.com/about/careers/applications/jobs/results/?location=Bangalore%20India"],
-  uber: ["https://jobs.uber.com/en/jobs/?location=Bengaluru"],
-  gojek: ["https://www.gojek.io/careers"],
-  tekion: ["https://tekion.com/careers"],
-  godaddy: ["https://careers.godaddy.com/search-results"],
-  commvault: ["https://careers.commvault.com/us/en/search-results"],
-  cisco: ["https://jobs.cisco.com/jobs/SearchJobs"],
-  adobe: ["https://careers.adobe.com/us/en/search-results"],
-  intuit: ["https://www.intuit.com/in/careers/"],
-  browserstack: ["https://www.browserstack.com/careers"],
-  lenskart: ["https://careers.lenskart.com/"],
-  phonepe: ["https://www.phonepe.com/careers/"],
-  meesho: ["https://meesho.io/careers"],
-};
 
 const FRONTEND_KEYWORDS = [
   "frontend",
@@ -61,34 +23,18 @@ const FRONTEND_KEYWORDS = [
   "typescript",
 ];
 
-function companyToBaseUrl(company: string): string[] {
-  const clean = company
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[^a-z0-9]/g, "");
-
-  const withDash = company
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, "-");
-
-  return [
-    `https://www.${clean}.com`,
-    `https://${clean}.com`,
-  ];
-}
-
-async function fetchPageContent(url: string): Promise<string | null> {
+async function fetchPage(url: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
+    const timeout = setTimeout(() => controller.abort(), 6000);
 
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
       },
       redirect: "follow",
     });
@@ -96,74 +42,197 @@ async function fetchPageContent(url: string): Promise<string | null> {
     clearTimeout(timeout);
     if (!res.ok) return null;
 
-    const text = await res.text();
-    return text;
+    return await res.text();
   } catch {
     return null;
   }
 }
 
-function extractJobListings(
-  html: string,
-  baseUrl: string
-): Array<{ title: string; url: string }> {
-  const listings: Array<{ title: string; url: string }> = [];
+// --- LinkedIn Public Job Search ---
 
-  // Match <a> tags with job-related href and text
-  const linkRegex =
-    /<a[^>]*href=["']([^"']*?)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let match;
+interface LinkedInJob {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  description: string;
+}
 
-  while ((match = linkRegex.exec(html)) !== null) {
-    const href = match[1];
-    const text = match[2].replace(/<[^>]*>/g, "").trim();
+async function searchLinkedIn(
+  query: string,
+  location: string
+): Promise<LinkedInJob[]> {
+  // LinkedIn public job search (no login needed)
+  const encodedQuery = encodeURIComponent(query);
+  const encodedLocation = encodeURIComponent(location);
+  const url = `https://www.linkedin.com/jobs/search?keywords=${encodedQuery}&location=${encodedLocation}&f_TPR=r604800&position=1&pageNum=0`;
 
-    if (!text || text.length < 5 || text.length > 200) continue;
+  const html = await fetchPage(url);
+  if (!html) return [];
 
-    const textLower = text.toLowerCase();
-    const isFrontend = FRONTEND_KEYWORDS.some((kw) => textLower.includes(kw));
+  const jobs: LinkedInJob[] = [];
 
-    if (isFrontend) {
-      let fullUrl = href;
-      if (href.startsWith("/")) {
-        const urlObj = new URL(baseUrl);
-        fullUrl = `${urlObj.origin}${href}`;
-      } else if (!href.startsWith("http")) {
-        fullUrl = `${baseUrl}/${href}`;
+  // Extract job cards from LinkedIn public page
+  // LinkedIn public pages have structured data in <script type="application/ld+json">
+  const jsonLdRegex = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
+  let jsonMatch;
+
+  while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
+    try {
+      const data = JSON.parse(jsonMatch[1]);
+      if (data["@type"] === "JobPosting") {
+        jobs.push({
+          title: data.title || "",
+          company: data.hiringOrganization?.name || "",
+          location: data.jobLocation?.address?.addressLocality || location,
+          url: data.url || "",
+          description: (data.description || "").replace(/<[^>]*>/g, "").slice(0, 500),
+        });
       }
-
-      listings.push({ title: text, url: fullUrl });
+      // Handle array of job postings
+      if (Array.isArray(data.itemListElement)) {
+        for (const item of data.itemListElement) {
+          const job = item.item || item;
+          if (job["@type"] === "JobPosting" || job.title) {
+            jobs.push({
+              title: job.title || "",
+              company: job.hiringOrganization?.name || "",
+              location: job.jobLocation?.address?.addressLocality || location,
+              url: job.url || "",
+              description: (job.description || "").replace(/<[^>]*>/g, "").slice(0, 500),
+            });
+          }
+        }
+      }
+    } catch {
+      // Skip invalid JSON
     }
   }
 
-  return listings;
-}
+  // Fallback: extract from HTML job cards
+  if (jobs.length === 0) {
+    const cardRegex = /<a[^>]*class="[^"]*base-card__full-link[^"]*"[^>]*href="([^"]*)"[^>]*>[\s\S]*?<span[^>]*class="[^"]*sr-only[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
+    const companyRegex = /<h4[^>]*class="[^"]*base-search-card__subtitle[^"]*"[^>]*>([\s\S]*?)<\/h4>/gi;
+    const locationRegex = /<span[^>]*class="[^"]*job-search-card__location[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
 
-async function scrapeJobDescription(url: string): Promise<string | null> {
-  const html = await fetchPageContent(url);
-  if (!html) return null;
+    const titles: Array<{ url: string; title: string }> = [];
+    let cardMatch;
+    while ((cardMatch = cardRegex.exec(html)) !== null) {
+      titles.push({
+        url: cardMatch[1].trim(),
+        title: cardMatch[2].replace(/<[^>]*>/g, "").trim(),
+      });
+    }
 
-  // Extract text content from the page, strip HTML
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (!bodyMatch) return null;
+    const companies: string[] = [];
+    let compMatch;
+    while ((compMatch = companyRegex.exec(html)) !== null) {
+      companies.push(compMatch[1].replace(/<[^>]*>/g, "").trim());
+    }
 
-  let text = bodyMatch[1]
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
-    .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "")
-    .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    const locations: string[] = [];
+    let locMatch;
+    while ((locMatch = locationRegex.exec(html)) !== null) {
+      locations.push(locMatch[1].replace(/<[^>]*>/g, "").trim());
+    }
 
-  // Limit to reasonable length
-  if (text.length > 5000) {
-    text = text.slice(0, 5000);
+    for (let i = 0; i < Math.min(titles.length, 20); i++) {
+      jobs.push({
+        title: titles[i].title,
+        company: companies[i] || "Unknown",
+        location: locations[i] || location,
+        url: titles[i].url,
+        description: "",
+      });
+    }
   }
 
-  return text.length > 100 ? text : null;
+  return jobs.slice(0, 20);
 }
+
+// --- Naukri Public Job Search ---
+
+interface NaukriJob {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  description: string;
+  salary: string;
+}
+
+async function searchNaukri(
+  query: string,
+  location: string
+): Promise<NaukriJob[]> {
+  // Naukri public job search
+  const encodedQuery = query.replace(/\s+/g, "-");
+  const encodedLocation = location.toLowerCase().replace(/\s+/g, "-");
+  const url = `https://www.naukri.com/${encodedQuery}-jobs-in-${encodedLocation}`;
+
+  const html = await fetchPage(url);
+  if (!html) return [];
+
+  const jobs: NaukriJob[] = [];
+
+  // Try JSON-LD first
+  const jsonLdRegex = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi;
+  let jsonMatch;
+
+  while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
+    try {
+      const data = JSON.parse(jsonMatch[1]);
+      if (data["@type"] === "JobPosting") {
+        jobs.push({
+          title: data.title || "",
+          company: data.hiringOrganization?.name || "",
+          location: data.jobLocation?.address?.addressLocality || location,
+          url: data.url || "",
+          description: (data.description || "").replace(/<[^>]*>/g, "").slice(0, 500),
+          salary: data.baseSalary?.value?.value ? `${data.baseSalary.value.value}` : "",
+        });
+      }
+      if (Array.isArray(data.itemListElement)) {
+        for (const item of data.itemListElement.slice(0, 20)) {
+          const job = item.item || item;
+          if (job.title) {
+            jobs.push({
+              title: job.title || "",
+              company: job.hiringOrganization?.name || "",
+              location: job.jobLocation?.address?.addressLocality || location,
+              url: job.url || "",
+              description: (job.description || "").replace(/<[^>]*>/g, "").slice(0, 500),
+              salary: "",
+            });
+          }
+        }
+      }
+    } catch {
+      // Skip
+    }
+  }
+
+  // Fallback: extract from Naukri HTML structure
+  if (jobs.length === 0) {
+    const titleRegex = /<a[^>]*class="[^"]*title[^"]*"[^>]*href="([^"]*)"[^>]*title="([^"]*)"[^>]*>/gi;
+    let titleMatch;
+
+    while ((titleMatch = titleRegex.exec(html)) !== null) {
+      jobs.push({
+        title: titleMatch[2].trim(),
+        company: "",
+        location: location,
+        url: titleMatch[1].trim(),
+        description: "",
+        salary: "",
+      });
+    }
+  }
+
+  return jobs.slice(0, 20);
+}
+
+// --- Company-specific search ---
 
 export async function scrapeCompanyJobs(
   company: string,
@@ -171,132 +240,113 @@ export async function scrapeCompanyJobs(
 ): Promise<ScrapedJob[]> {
   const jobs: ScrapedJob[] = [];
 
-  // Step 1: Try provided careers URL
-  if (careersUrl) {
-    const html = await fetchPageContent(careersUrl);
-    if (html) {
-      const listings = extractJobListings(html, careersUrl);
-      for (const listing of listings.slice(0, 3)) {
-        const description = await scrapeJobDescription(listing.url);
-        if (description) {
-          jobs.push({
-            role: listing.title,
-            location: extractLocation(description),
-            description,
-            applyUrl: listing.url,
-            source: "career_page",
-          });
-        }
-      }
-    }
-    if (jobs.length > 0) return jobs;
+  // Step 1: Search LinkedIn for company + frontend roles
+  const linkedInJobs = await searchLinkedIn(
+    `frontend engineer ${company}`,
+    "India"
+  );
+
+  const companyLower = company.toLowerCase();
+  const matchedLinkedIn = linkedInJobs.filter((j) =>
+    j.company.toLowerCase().includes(companyLower.slice(0, 4)) ||
+    j.title.toLowerCase().includes("frontend") ||
+    j.title.toLowerCase().includes("react")
+  );
+
+  for (const job of matchedLinkedIn.slice(0, 3)) {
+    jobs.push({
+      role: job.title,
+      location: job.location,
+      description: job.description,
+      applyUrl: job.url,
+      source: "linkedin",
+    });
   }
 
-  // Step 2: Try known career URLs for this company
-  const companyKey = company.toLowerCase().replace(/\s+/g, "");
-  const knownUrls = KNOWN_CAREER_URLS[companyKey] || [];
-  for (const url of knownUrls) {
-    const html = await fetchPageContent(url);
-    if (!html) continue;
+  if (jobs.length > 0) return jobs;
 
-    const listings = extractJobListings(html, url);
-    for (const listing of listings.slice(0, 3)) {
-      const description = await scrapeJobDescription(listing.url);
-      if (description) {
-        jobs.push({
-          role: listing.title,
-          location: extractLocation(description),
-          description,
-          applyUrl: listing.url,
-          source: "career_page",
-        });
-      }
-    }
+  // Step 2: Search Naukri
+  const naukriJobs = await searchNaukri(
+    `frontend developer ${company}`,
+    "bangalore"
+  );
 
-    if (jobs.length > 0) return jobs;
+  const matchedNaukri = naukriJobs.filter((j) =>
+    j.company.toLowerCase().includes(companyLower.slice(0, 4)) ||
+    j.title.toLowerCase().includes("frontend") ||
+    j.title.toLowerCase().includes("react")
+  );
+
+  for (const job of matchedNaukri.slice(0, 3)) {
+    jobs.push({
+      role: job.title,
+      location: job.location,
+      description: job.description,
+      applyUrl: job.url,
+      source: "naukri",
+    });
   }
 
-  // Step 3: Try common career page patterns on guessed URLs
-  const baseUrls = companyToBaseUrl(company);
-  for (const baseUrl of baseUrls) {
-    for (const pattern of CAREER_PAGE_PATTERNS) {
-      const url = `${baseUrl}${pattern}`;
-      const html = await fetchPageContent(url);
-      if (!html) continue;
+  if (jobs.length > 0) return jobs;
 
-      const listings = extractJobListings(html, url);
-      for (const listing of listings.slice(0, 3)) {
-        const description = await scrapeJobDescription(listing.url);
-        if (description) {
-          jobs.push({
-            role: listing.title,
-            location: extractLocation(description),
-            description,
-            applyUrl: listing.url,
-            source: "career_page",
-          });
-        }
-      }
-
-      if (jobs.length > 0) return jobs;
-    }
+  // Step 3: Generic LinkedIn search (not company-specific)
+  const genericLinkedIn = await searchLinkedIn("frontend engineer react", "India");
+  for (const job of genericLinkedIn.slice(0, 3)) {
+    jobs.push({
+      role: job.title,
+      location: job.location,
+      description: job.description,
+      applyUrl: job.url,
+      source: "linkedin",
+    });
   }
-
-  // Step 3: Fall back to Adzuna API (company-specific)
-  const adzunaJobs = await searchAdzunaForCompany(company);
-  if (adzunaJobs.length > 0) {
-    jobs.push(...adzunaJobs);
-    return jobs;
-  }
-
-  // Step 4: Generic frontend job search via Adzuna (not company-specific)
-  const genericJobs = await searchAdzunaGeneric();
-  jobs.push(...genericJobs);
 
   return jobs;
 }
 
-async function searchAdzunaGeneric(): Promise<ScrapedJob[]> {
-  const appId = process.env.ADZUNA_APP_ID;
-  const appKey = process.env.ADZUNA_APP_KEY;
-  if (!appId || !appKey) return [];
+// --- Exports for Live Feed page ---
 
-  try {
-    const params = new URLSearchParams({
-      app_id: appId,
-      app_key: appKey,
-      results_per_page: "5",
-      what: "frontend engineer react typescript",
-      where: "bangalore",
-      "content-type": "application/json",
-    });
+export async function searchJobsFeed(
+  query: string,
+  location: string
+): Promise<
+  Array<{
+    title: string;
+    company: string;
+    location: string;
+    salary: string;
+    url: string;
+    description: string;
+    source: string;
+  }>
+> {
+  const [linkedInJobs, naukriJobs] = await Promise.all([
+    searchLinkedIn(query, location),
+    searchNaukri(query, location),
+  ]);
 
-    const res = await fetch(
-      `https://api.adzuna.com/v1/api/jobs/in/search/1?${params}`,
-      { signal: AbortSignal.timeout(10000) }
-    );
+  const results = [
+    ...linkedInJobs.map((j) => ({
+      title: j.title,
+      company: j.company,
+      location: j.location,
+      salary: "",
+      url: j.url,
+      description: j.description,
+      source: "LinkedIn",
+    })),
+    ...naukriJobs.map((j) => ({
+      title: j.title,
+      company: j.company,
+      location: j.location,
+      salary: j.salary,
+      url: j.url,
+      description: j.description,
+      source: "Naukri",
+    })),
+  ];
 
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    return (data.results || []).slice(0, 3).map(
-      (job: {
-        title: string;
-        company?: { display_name?: string };
-        location?: { display_name?: string };
-        description?: string;
-        redirect_url: string;
-      }) => ({
-        role: job.title,
-        location: job.location?.display_name || "India",
-        description: (job.description || "").slice(0, 3000),
-        applyUrl: job.redirect_url,
-        source: "adzuna" as const,
-      })
-    );
-  } catch {
-    return [];
-  }
+  return results;
 }
 
 function extractLocation(text: string): string {
@@ -311,71 +361,4 @@ function extractLocation(text: string): string {
   }
 
   return "India";
-}
-
-async function searchAdzunaForCompany(
-  company: string
-): Promise<ScrapedJob[]> {
-  const appId = process.env.ADZUNA_APP_ID;
-  const appKey = process.env.ADZUNA_APP_KEY;
-  if (!appId || !appKey) return [];
-
-  // Try company-specific search first, then generic frontend search
-  const queries = [
-    `frontend engineer ${company}`,
-    `react developer ${company}`,
-    `frontend engineer`,
-  ];
-
-  for (const query of queries) {
-    try {
-      const params = new URLSearchParams({
-        app_id: appId,
-        app_key: appKey,
-        results_per_page: "10",
-        what: query,
-        "content-type": "application/json",
-      });
-
-      const res = await fetch(
-        `https://api.adzuna.com/v1/api/jobs/in/search/1?${params}`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      const results = (data.results || []) as Array<{
-        title: string;
-        company?: { display_name?: string };
-        location?: { display_name?: string };
-        description?: string;
-        redirect_url: string;
-      }>;
-
-      // For company-specific queries, try to match company name
-      const companyLower = company.toLowerCase();
-      let filtered = results.filter((job) => {
-        const jobCompany = job.company?.display_name?.toLowerCase() || "";
-        return jobCompany.includes(companyLower.slice(0, 4));
-      });
-
-      // For generic query, skip — only return company-matched results
-      if (filtered.length === 0) continue;
-
-      if (filtered.length === 0) continue;
-
-      return filtered.slice(0, 3).map((job) => ({
-        role: job.title,
-        location: job.location?.display_name || "India",
-        description: job.description?.slice(0, 3000) || "",
-        applyUrl: job.redirect_url,
-        source: "adzuna" as const,
-      }));
-    } catch {
-      continue;
-    }
-  }
-
-  return [];
 }
