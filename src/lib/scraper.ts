@@ -11,6 +11,71 @@ interface ScrapedJob {
   source: "linkedin" | "naukri" | "career_page";
 }
 
+// Max experience in years — filters out senior/staff roles requiring 8+ years
+const MAX_EXPERIENCE_YEARS = 5;
+
+// Keywords that indicate the role needs too much experience
+const SENIOR_BLOCKLIST = [
+  "staff engineer",
+  "principal engineer",
+  "distinguished engineer",
+  "engineering manager",
+  "director of engineering",
+  "vp engineering",
+  "head of engineering",
+  "architect",
+  "lead architect",
+];
+
+/**
+ * Extract years of experience required from job title + description.
+ * Returns null if can't determine.
+ */
+function extractExperienceYears(title: string, description: string): number | null {
+  const text = `${title} ${description}`.toLowerCase();
+
+  // Check blocklist first
+  for (const blocked of SENIOR_BLOCKLIST) {
+    if (text.includes(blocked)) return 99;
+  }
+
+  // Match patterns like "8+ years", "10-12 years", "8 to 12 years", "minimum 8 years"
+  const patterns = [
+    /(\d{1,2})\s*\+\s*(?:years|yrs|yr)/i,
+    /(\d{1,2})\s*-\s*(\d{1,2})\s*(?:years|yrs|yr)/i,
+    /(\d{1,2})\s*to\s*(\d{1,2})\s*(?:years|yrs|yr)/i,
+    /(?:minimum|min|at least)\s*(\d{1,2})\s*(?:years|yrs|yr)/i,
+    /(?:experience|exp)[:\s]*(\d{1,2})\s*(?:years|yrs|yr)/i,
+    /(\d{1,2})\s*(?:years|yrs|yr)\s*(?:of\s*)?(?:experience|exp)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      // For ranges like "8-12", use the minimum
+      const minYears = parseInt(match[1], 10);
+      return minYears;
+    }
+  }
+
+  // Infer from title keywords
+  if (text.includes("senior") || text.includes("sr.") || text.includes("sr ")) return 5;
+  if (text.includes("lead")) return 5;
+  if (text.includes("junior") || text.includes("jr")) return 1;
+  if (text.includes("intern")) return 0;
+
+  return null;
+}
+
+/**
+ * Check if job is within experience range for the candidate (0-5 years).
+ */
+function isExperienceMatch(title: string, description: string): boolean {
+  const years = extractExperienceYears(title, description);
+  if (years === null) return true; // Can't determine, include it
+  return years <= MAX_EXPERIENCE_YEARS;
+}
+
 const FRONTEND_KEYWORDS = [
   "frontend",
   "front-end",
@@ -147,7 +212,9 @@ async function searchLinkedIn(
     }
   }
 
-  return jobs.slice(0, 20);
+  // Filter by experience
+  const filtered = jobs.filter((j) => isExperienceMatch(j.title, j.description));
+  return filtered.slice(0, 20);
 }
 
 // --- Naukri Public Job Search ---
@@ -229,7 +296,8 @@ async function searchNaukri(
     }
   }
 
-  return jobs.slice(0, 20);
+  const filtered = jobs.filter((j) => isExperienceMatch(j.title, j.description));
+  return filtered.slice(0, 20);
 }
 
 // --- Company-specific search ---
