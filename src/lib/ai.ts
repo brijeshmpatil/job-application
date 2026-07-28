@@ -41,6 +41,14 @@ RULES:
 6. Keep changes minimal and impactful — 3 to 6 changes max
 7. Focus on: summary paragraph, bullet point text, skill tag order
 
+NEVER CHANGE THESE (keep exactly as-is):
+- Job titles: "SDE 2 — Frontend Engineer & Team Lead", "SDE 1 — Frontend Engineer"
+- Company name: "ShopTrade"
+- Dates: "Apr 2026 – Present", "Sep 2023 – May 2026"
+- Education details
+- Contact info (name, email, phone, LinkedIn)
+- Project names (Jatai, Solefly, StickersBanners, Fire The Imagination)
+
 COMPANY: ${company}
 ROLE: ${role}
 

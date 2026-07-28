@@ -1,4 +1,8 @@
 import { NextRequest } from "next/server";
+import { writeFileSync, mkdirSync } from "fs";
+import path from "path";
+
+const RAVER_DIR = path.join(process.env.HOME || "", "Desktop/RaveR");
 
 export async function POST(request: NextRequest) {
   const { html, companyName } = await request.json();
@@ -8,7 +12,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Dynamic import to avoid loading puppeteer at startup
     const puppeteer = await import("puppeteer");
     const browser = await puppeteer.default.launch({
       headless: true,
@@ -26,18 +29,29 @@ export async function POST(request: NextRequest) {
 
     await browser.close();
 
-    const filename = `Brijesh_M_Patil_Resume_${companyName || "tailored"}.pdf`;
+    const cleanName = (companyName || "tailored").replace(/[^a-zA-Z0-9]/g, "_");
+    const filename = `Brijesh_M_Patil_Resume_${cleanName}.pdf`;
+
+    // Save to Desktop/RaveR
+    mkdirSync(RAVER_DIR, { recursive: true });
+    const savePath = path.join(RAVER_DIR, filename);
+    writeFileSync(savePath, pdfBuffer);
+
+    // Also save tailored HTML
+    const htmlFilename = `${cleanName}_tailored_resume.html`;
+    writeFileSync(path.join(RAVER_DIR, htmlFilename), html);
 
     return new Response(Buffer.from(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="${filename}"`,
+        "X-Saved-Path": savePath,
       },
     });
   } catch (err) {
     console.error("PDF export error:", err);
     return Response.json(
-      { error: "Failed to generate PDF. Ensure puppeteer is installed." },
+      { error: "Failed to generate PDF." },
       { status: 500 }
     );
   }
