@@ -79,15 +79,43 @@ export default function PipelinePage() {
   };
 
   const approveItem = async (id: string) => {
+    // Find the item to get tailored HTML for PDF
+    const item = items.find((i) => i.id === id);
+
+    // Step 1: Generate and download tailored PDF
+    if (item?.tailored_html) {
+      try {
+        const pdfRes = await apiPost("/api/resume/export", {
+          html: item.tailored_html,
+          companyName: item.company,
+        });
+        const blob = await pdfRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Brijesh_M_Patil_Resume_${item.company.replace(/\s+/g, "_")}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        // PDF export failed — continue with approve anyway
+      }
+    }
+
+    // Step 2: Approve and get apply URL
     const res = await apiPost("/api/pipeline", { action: "approve", id });
     const data = await res.json();
+
+    // Step 3: Open apply link
     if (data.apply_url) {
-      window.open(
-        data.apply_url.startsWith("http")
-          ? data.apply_url
-          : `https://${data.apply_url}`,
-        "_blank"
-      );
+      // Small delay so PDF download starts first
+      setTimeout(() => {
+        window.open(
+          data.apply_url.startsWith("http")
+            ? data.apply_url
+            : `https://${data.apply_url}`,
+          "_blank"
+        );
+      }, 500);
     }
     fetchItems();
   };
