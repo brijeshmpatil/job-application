@@ -79,11 +79,13 @@ export default function PipelinePage() {
   };
 
   const approveItem = async (id: string) => {
-    // Find the item to get tailored HTML for PDF
     const item = items.find((i) => i.id === id);
+    if (!item) return;
 
-    // Step 1: Generate and download tailored PDF
-    if (item?.tailored_html) {
+    const cleanCompany = item.company.replace(/\s+/g, "_");
+
+    // Step 1: Download tailored resume PDF
+    if (item.tailored_html) {
       try {
         const pdfRes = await apiPost("/api/resume/export", {
           html: item.tailored_html,
@@ -93,21 +95,43 @@ export default function PipelinePage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `Brijesh_M_Patil_Resume_${item.company.replace(/\s+/g, "_")}.pdf`;
+        a.download = `Brijesh_M_Patil_Resume_${cleanCompany}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
       } catch {
-        // PDF export failed — continue with approve anyway
+        // Resume PDF failed — continue
       }
     }
 
-    // Step 2: Approve and get apply URL
+    // Step 2: Generate and download cover letter PDF
+    try {
+      const clRes = await apiPost("/api/cover-letter", {
+        company: item.company,
+        role: item.role || "Frontend Engineer",
+        description: item.description || "",
+        location: item.location || "India",
+      });
+      if (clRes.ok) {
+        const blob = await clRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Cover_Letter_${cleanCompany}.pdf`;
+        setTimeout(() => {
+          a.click();
+          URL.revokeObjectURL(url);
+        }, 500);
+      }
+    } catch {
+      // Cover letter failed — continue
+    }
+
+    // Step 3: Approve and get apply URL
     const res = await apiPost("/api/pipeline", { action: "approve", id });
     const data = await res.json();
 
-    // Step 3: Open apply link
+    // Step 4: Open apply link
     if (data.apply_url) {
-      // Small delay so PDF download starts first
       setTimeout(() => {
         window.open(
           data.apply_url.startsWith("http")
@@ -115,7 +139,7 @@ export default function PipelinePage() {
             : `https://${data.apply_url}`,
           "_blank"
         );
-      }, 500);
+      }, 1500);
     }
     fetchItems();
   };
